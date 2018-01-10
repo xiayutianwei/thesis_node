@@ -1,39 +1,32 @@
 package thesis.core
 
 import akka.actor.Actor.Receive
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSocketRequest}
 import akka.stream.{ActorAttributes, OverflowStrategy, Supervision}
 import akka.stream.scaladsl._
 import akka.actor._
+import akka.http.scaladsl.model.ws._
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.StatusCodes
 import akka.stream.Supervision.Decider
+import akka.util.ByteStringBuilder
 import org.slf4j._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import thesis.core.Mission.Instruct
+import thesis.common.AppSettings._
+
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
+import scala.concurrent.duration._
 /**
   * Created by liuziwei on 2017/12/26.
   */
 object Node{
   sealed trait Command extends Heart.Command
-  case class Register(name:String) extends Command
-  case class RegisterRst(flow:Flow[Message, Message, Any])
-  def props(name:String) = Props[Node](new Node(name))
-  private def playInSink(actor: ActorRef) = Sink.actorRef[Heart.Command](actor, "stop")
-  def getFlow(heart: ActorRef,mission:ActorRef): Flow[String, Instruct, Any] = {
-    val in =
-      Flow[String]
-        .map { s =>
-          Heart.HeartBeet
-        }
-        .to(playInSink(heart))
-
-    val out =
-      Source.actorRef[Instruct](3, OverflowStrategy.dropHead)
-        .mapMaterializedValue(outActor => mission ! Mission.Register(outActor))
-
-
-    Flow.fromSinkAndSource(in, out)
-  }
+  case object Start extends Command
+  case object Work extends Command
+  case object WsClosed extends Command
+  def props = Props[Node](new Node)
 
   object Symbol{
     val Heart = "heart"
@@ -41,7 +34,7 @@ object Node{
   }
 }
 
-class Node(name:String) extends Actor {
+class Node extends Actor {
 
   import Node._
 
@@ -67,28 +60,46 @@ class Node(name:String) extends Actor {
 
   @scala.throws[Exception](classOf[Exception])
   override def preStart(): Unit = {
-    log.info(s"node $name create...")
+    log.info(s"node  starting...")
+    self ! Start
   }
 
   override def receive: Receive = idle
 
   def idle:Receive = {
-      case Register(_) =>
-        val flow: Flow[Message, Message, Any] =
-          Flow[Message]
-            .collect {
-              case TextMessage.Strict(m) =>
-                log.debug(s"msg from webSocket: $m")
-                m
-            }
-            .via(getFlow(getChild(Symbol.Heart),getChild(Symbol.Mission)))
-            .map {
-              rsp =>
-                log.debug(s"reply is $rsp \n ${rsp.asJson.noSpaces}")
-                TextMessage.Strict(rsp.asJson.noSpaces)
-            }.withAttributes(ActorAttributes.supervisionStrategy(decider))
+      case Start =>
+        val webSocketFlow1 = Http().webSocketClientFlow(WebSocketRequest(s"ws://$masterHost:$masterPort/node/subscribe?name=$nodeName"))
+        val response =
+          Source.actorRef(1024,OverflowStrategy.fail).mapMaterializedValue(outActor => getChild(Symbol.Heart) ! Heart)
+            .viaMat(webSocketFlow1)(Keep.right)
+            .toMat(Sink.actorRef[Message](getChild(Symbol.Mission),"stop"))(Keep.left)
+            .run()
+        //  val closed = webSocketFlow1.watchTermination().andThen()
+        val connected = response.flatMap { upgrade =>
+          if (upgrade.response.status == StatusCodes.SwitchingProtocols) {
+            Future.successful("connect success")
+          } else {
+            throw new RuntimeException(s"Connection failed: ${upgrade.response.status}")
+          }
+        } //链接建立时
+        connected.onComplete{
+          case Success(i) =>
+            log.error(s"connected failure:${i.toString}")
+            self ! Work
+          case Failure(e) =>
+            log.error(s"connected failure:${e.getMessage}")
+            context.system.scheduler.scheduleOnce(5 minute,self,Start)
+        }
 
+      case Work =>
+        context.become(work)
+      case _ =>
+  }
 
-        sender() ! RegisterRst(flow)
+  def work:Receive = {
+    case WsClosed =>
+      context.become(idle)
+      context.system.scheduler.scheduleOnce(5 minute,self,Start)
+    case _ =>
   }
 }

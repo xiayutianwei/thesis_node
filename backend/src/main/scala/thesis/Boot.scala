@@ -10,7 +10,7 @@ import akka.typed.scaladsl.adapter.PropsAdapter
 import akka.util.Timeout
 import thesis.service.HttpService
 import common.AppSettings._
-import thesis.core.Master
+import thesis.core.{Master, Node}
 
 import scala.util.{Failure, Success}
 
@@ -33,7 +33,7 @@ object Boot extends HttpService{
   override implicit val scheduler = system.scheduler
   override implicit val timeout = Timeout(60 seconds) // for actor asks
 
-  override val masterService = system.actorOf(Master.props)
+  override val masterService = system.actorOf(Node.props)
 
 
   val log: LoggingAdapter = Logging(system, getClass)

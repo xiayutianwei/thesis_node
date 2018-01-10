@@ -37,7 +37,9 @@ object AppSettings {
 
   val httpInterface = appConfig.getString("http.interface")
   val httpPort = appConfig.getInt("http.port")
-
+  val masterHost = appConfig.getString("master.host")
+  val masterPort = appConfig.getInt("master.port")
+  val nodeName = appConfig.getString("name")
 
   val slickConfig = config.getConfig("slick.db")
   val slickUrl = slickConfig.getString("url")

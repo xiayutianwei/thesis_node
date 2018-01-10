@@ -7,23 +7,19 @@ import org.slf4j._
   * Created by liuziwei on 2017/12/26.
   */
 object Heart {
-
   trait Command
-  object HeartBeet extends Command
-  case class Register(name:String) extends Command
+  case class Register(outActor:ActorRef) extends Command
 
-  def props = Props[Heart](new Heart)
-
-
-
+  def props = Props[Mission](new Mission)
 }
 
 class Heart extends Actor {
+
   import Heart._
 
-  private var lastTime = 0l
-
   private val log = LoggerFactory.getLogger(this.getClass)
+
+
 
   @scala.throws[Exception](classOf[Exception])
   override def preStart(): Unit = {
@@ -32,11 +28,15 @@ class Heart extends Actor {
 
   override def receive: Receive = idle
 
-  def idle:Receive =  {
-    case HeartBeet =>
-      log.info(s"${self.path} receive heartbeat")
-      lastTime = System.currentTimeMillis()
-    case Register(name) =>
-      log.info(s"node $name register success")
+  def idle:Receive = {
+    case Register(outer) =>
+      context.become(work(outer))
+      context.watch(outer)
+  }
+
+  def work(outer:ActorRef):Receive = {
+    case Terminated(child) =>
+      log.error(s"${child.path} dead...")
+      context.become(idle)
   }
 }
