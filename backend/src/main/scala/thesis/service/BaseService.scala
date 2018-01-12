@@ -27,7 +27,7 @@ trait BaseService extends CirceSupport{
   implicit val materializer: Materializer
   implicit val timeout: Timeout
   implicit val scheduler: Scheduler
-  val masterService:ActorRef
+  val nodeService:ActorRef
 
 //  val postPreProcessingActor:ActorRef[PostPreProcessingActor.Command]
 

@@ -2,17 +2,18 @@ package thesis.core
 
 import akka.actor.Actor.Receive
 import akka.actor._
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import org.slf4j._
+import thesis.common.AppSettings._
+import thesis.Boot.executor
 /**
   * Created by liuziwei on 2017/12/26.
   */
 object Mission {
 
   trait Command
-  object HeartBeet extends Command
-  case class Register(name:String) extends Command
 
-  def props = Props[Heart](new Heart)
+  def props = Props[Mission](new Mission)
 
 
 
@@ -33,10 +34,11 @@ class Mission extends Actor {
   override def receive: Receive = idle
 
   def idle:Receive =  {
-    case HeartBeet =>
-      log.info(s"${self.path} receive heartbeat")
-      lastTime = System.currentTimeMillis()
-    case Register(name) =>
-      log.info(s"node $name register success")
+    case msg:Message =>
+      msg match{
+        case str:TextMessage =>
+          log.info(s"$nodeName receive mission $str")
+        case _:BinaryMessage =>
+      }
   }
 }

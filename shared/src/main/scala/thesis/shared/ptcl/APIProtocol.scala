@@ -1,6 +1,5 @@
 package thesis.shared.ptcl
 
-import thesis.shared.shared.CommonRsp
 
 /**
   * Created by liuziwei on 2017/10/27.

@@ -7,6 +7,6 @@ import akka.http.scaladsl.server.Directives._
 trait HttpService extends NodeService{
 
   val routes = pathPrefix("master"){
-    nodeRoutes
+    complete("")
   }
 }

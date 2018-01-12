@@ -2,7 +2,7 @@ package thesis.core
 
 import akka.actor.Actor.Receive
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSocketRequest}
-import akka.stream.{ActorAttributes, OverflowStrategy, Supervision}
+import akka.stream.{ActorAttributes, Materializer, OverflowStrategy, Supervision}
 import akka.stream.scaladsl._
 import akka.actor._
 import akka.http.scaladsl.model.ws._
@@ -14,8 +14,10 @@ import org.slf4j._
 import io.circe.generic.auto._
 import io.circe.syntax._
 import thesis.common.AppSettings._
+import thesis.Boot._
+import thesis.core.Heart.Register
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 import scala.concurrent.duration._
 /**
@@ -68,9 +70,10 @@ class Node extends Actor {
 
   def idle:Receive = {
       case Start =>
-        val webSocketFlow1 = Http().webSocketClientFlow(WebSocketRequest(s"ws://$masterHost:$masterPort/node/subscribe?name=$nodeName"))
+        var outer:ActorRef = null
+        val webSocketFlow1 = Http().webSocketClientFlow(WebSocketRequest(s"ws://$masterHost:$masterPort/master/node/subscribe?name=$nodeName"))
         val response =
-          Source.actorRef(1024,OverflowStrategy.fail).mapMaterializedValue(outActor => getChild(Symbol.Heart) ! Heart)
+          Source.actorRef(1024,OverflowStrategy.fail).mapMaterializedValue(outActor => outer = outActor)
             .viaMat(webSocketFlow1)(Keep.right)
             .toMat(Sink.actorRef[Message](getChild(Symbol.Mission),"stop"))(Keep.left)
             .run()
@@ -84,7 +87,8 @@ class Node extends Actor {
         } //链接建立时
         connected.onComplete{
           case Success(i) =>
-            log.error(s"connected failure:${i.toString}")
+            log.info(s"connected failure:${i.toString}")
+            getChild(Symbol.Heart) ! Register(outer)
             self ! Work
           case Failure(e) =>
             log.error(s"connected failure:${e.getMessage}")
