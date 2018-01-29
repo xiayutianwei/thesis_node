@@ -103,7 +103,7 @@ class Node extends Actor {
   def work:Receive = {
     case WsClosed =>
       context.become(idle)
-      context.system.scheduler.scheduleOnce(5 minute,self,Start)
+      context.system.scheduler.scheduleOnce(2 minute,self,Start)
     case _ =>
   }
 }
