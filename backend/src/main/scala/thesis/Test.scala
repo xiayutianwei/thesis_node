@@ -1,6 +1,6 @@
 package thesis
 
-import java.io.{InputStreamReader, LineNumberReader}
+import java.io.{BufferedReader, InputStreamReader, LineNumberReader}
 
 /**
   * Created by liuziwei on 2017/11/3.
@@ -9,23 +9,22 @@ object Test {
 
   def main( args:Array[String]) {
     try {
-      val process = Runtime.getRuntime().exec(args(0))
-
-
-      val ir = new InputStreamReader(process.getInputStream())
-      val input = new LineNumberReader(ir)
-      var line = input.readLine()
-      while(line  != null) {
+      System.out.println("start")
+      val pr: Process = Runtime.getRuntime().exec("python E:\\workspace\\test\\main.py")
+      val in: BufferedReader = new BufferedReader(new InputStreamReader(pr.getInputStream()))
+      var line: String = in.readLine()
+      while (line!=null && line.length > 0) {
         System.out.println(line)
-        line = input.readLine()
+        line = in.readLine()
       }
-      input.close()
-      ir.close()
-      println(process.exitValue())
-    } catch  {
-      // TODO: handle exception
-      case e:Exception =>
+      in.close()
+     // pr.waitFor
+      System.out.println("end")
+    }
+    catch {
+      case e: Exception => {
         e.printStackTrace()
+      }
     }
   }
 
